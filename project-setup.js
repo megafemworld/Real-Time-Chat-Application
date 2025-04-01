@@ -1,0 +1,279 @@
+/**
+ * Real-Time Chat Application - Project Setup
+ * 
+ * This script initializes the directory structure and base files for our microservices
+ * architecture. It creates the necessary folders and installs required dependencies.
+ * 
+ * Usage: node project-setup.js
+ */
+
+const fs = require('fs');
+const { execSync } = require('child_process');
+const path = require('path');
+
+// Main project directories
+const directories = [
+  'services/auth-service',
+  'services/chat-service',
+  'services/api-gateway',
+  'deployment/kubernetes',
+  'deployment/docker',
+  'config',
+  'scripts',
+  'tests/unit',
+  'tests/integration',
+  'tests/e2e',
+  'monitoring'
+];
+
+// Create directories
+console.log('Creating project directory structure...');
+directories.forEach(dir => {
+  const fullPath = path.join(process.cwd(), dir);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+    console.log(`Created: ${fullPath}`);
+  }
+});
+
+// Initialize package.json for each service
+const services = [
+  'services/auth-service',
+  'services/chat-service',
+  'services/api-gateway'
+];
+
+console.log('\nInitializing microservices...');
+services.forEach(service => {
+  const servicePath = path.join(process.cwd(), service);
+  process.chdir(servicePath);
+  
+  // Initialize package.json if it doesn't exist
+  if (!fs.existsSync(path.join(servicePath, 'package.json'))) {
+    console.log(`Initializing ${service}...`);
+    execSync('npm init -y', { stdio: 'inherit' });
+    
+    // Update package.json with service-specific details
+    const packageJson = require(path.join(servicePath, 'package.json'));
+    const serviceName = service.split('/').pop();
+    
+    packageJson.name = serviceName;
+    packageJson.version = '1.0.0';
+    packageJson.description = `${serviceName} for Real-Time Chat Application`;
+    packageJson.main = 'src/index.js';
+    packageJson.scripts = {
+      "start": "node src/index.js",
+      "dev": "nodemon src/index.js",
+      "test": "jest",
+      "lint": "eslint ."
+    };
+    
+    fs.writeFileSync(
+      path.join(servicePath, 'package.json'),
+      JSON.stringify(packageJson, null, 2)
+    );
+    
+    // Create src directory
+    if (!fs.existsSync(path.join(servicePath, 'src'))) {
+      fs.mkdirSync(path.join(servicePath, 'src'));
+    }
+    
+    // Create a basic index.js file
+    fs.writeFileSync(
+      path.join(servicePath, 'src', 'index.js'),
+      `/**
+ * ${serviceName}
+ * 
+ * This service is part of the Real-Time Chat Application microservices architecture.
+ */
+
+console.log('${serviceName} is initializing...');
+`
+    );
+  }
+  
+  // Return to the project root
+  process.chdir(process.cwd());
+});
+
+// Create base configuration files
+console.log('\nCreating configuration files...');
+
+// Docker compose file
+const dockerComposeContent = `version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: chat-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    networks:
+      - chat-network
+
+  redis:
+    image: redis:alpine
+    container_name: chat-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - chat-network
+  
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: ../../deployment/docker/api-gateway.Dockerfile
+    container_name: chat-api-gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+    environment:
+      - NODE_ENV=development
+      - AUTH_SERVICE_URL=http://auth-service:4000
+      - CHAT_SERVICE_URL=http://chat-service:5000
+    networks:
+      - chat-network
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: ../../deployment/docker/auth-service.Dockerfile
+    container_name: chat-auth-service
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/chatapp?authSource=admin
+      - REDIS_URI=redis://redis:6379
+      - PORT=4000
+    networks:
+      - chat-network
+
+  chat-service:
+    build:
+      context: ./services/chat-service
+      dockerfile: ../../deployment/docker/chat-service.Dockerfile
+    container_name: chat-chat-service
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/chatapp?authSource=admin
+      - REDIS_URI=redis://redis:6379
+      - PORT=5000
+    networks:
+      - chat-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  chat-network:
+    driver: bridge
+`;
+
+fs.writeFileSync(
+  path.join(process.cwd(), 'docker-compose.yml'),
+  dockerComposeContent
+);
+
+// Create base .gitignore
+const gitignoreContent = `# Dependencies
+node_modules
+npm-debug.log
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented libs generated by jscoverage/JSCover
+lib-cov
+
+# Coverage directory used by tools like istanbul
+coverage
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Docker volumes
+data
+
+# IDE files
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+`;
+
+fs.writeFileSync(
+  path.join(process.cwd(), '.gitignore'),
+  gitignoreContent
+);
+
+// Create root package.json
+const rootPackageJson = {
+  "name": "real-time-chat-application",
+  "version": "1.0.0",
+  "description": "Enterprise-level real-time chat application with microservices architecture",
+  "scripts": {
+    "start": "docker-compose up",
+    "start:dev": "docker-compose up -d && npm run logs",
+    "logs": "docker-compose logs -f",
+    "stop": "docker-compose down",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "author": "Backend Engineer",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+};
+
+fs.writeFileSync(
+  path.join(process.cwd(), 'package.json'),
+  JSON.stringify(rootPackageJson, null, 2)
+);
+
+console.log('\nProject structure created successfully!');
+console.log('\nNext steps:');
+console.log('1. Review the generated structure');
+console.log('2. Install dependencies for each service');
+console.log('3. Start implementing the services one by one');
