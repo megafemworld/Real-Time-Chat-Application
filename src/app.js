@@ -109,9 +109,71 @@ app.use(
             : 'dev',
             {
                 stream: logger.stream,
-                skip: (req) => {
-                    req.url === '/health' || req.url === '/metrics';
-                }
+                skip: (req) => req.url === '/health' || req.url === '/metrics',
             }
     )
-)
+);
+
+// Apply rate limiting
+const apiLimiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || '15', 10) * 60 * 1000, // Default: 15 minutes
+    max: parseInt(process.RATE_LIMIT_REQUESTS || '100', 10), // Default: 100 requests per windowMS
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        status: 429,
+        message: 'Too many requests, please try again later.',
+    },
+    // Skip rate limiting for health check
+    skip: (req) => req.url === '/health',
+});
+
+// Apply rate limiting to API routes
+app.use('/api/', apiLimiter);
+
+// Request timing middleware
+app.use((req, res, next) => {
+    const startTime = Date.now();
+
+    // Intercept the response finish event
+    res.on('finish', () => {
+        const responseTime = Date.now() - startTime;
+        logger.logRequest(req, res, responseTime);
+    });
+
+    next();
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    const mongpoHealth = getMongoDBHealth();
+    const redisHealth = getRedisHealth();
+
+    const health = {
+        status: mongpoHealth.status && redisHealth.status === 'healthy'
+            ? 'healthy'
+            : 'unhealthy',
+        services: {
+            mongodb: mongpoHealth,
+            redis: redisHealth,
+            api: { status: 'healthy' }
+        },
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+    };
+
+    const statusCode = health.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(health);
+});
+
+// Error HAndler
+app.use((err, req, res, next) => {
+    const status = err.status || 500;
+
+    // Don't leak stack to client in production
+    const error = {
+        message: err. message,
+        status,
+        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+    };
+});
