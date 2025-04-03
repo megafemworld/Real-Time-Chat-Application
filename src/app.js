@@ -172,8 +172,25 @@ app.use((err, req, res, next) => {
 
     // Don't leak stack to client in production
     const error = {
-        message: err. message,
+        message: err.message,
         status,
         ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
     };
+
+    // Log server errors (5xx)
+    if (status >= 500) {
+        logger.error(`Server error: ${err.message}`, { error: error, stack: error.stack });
+    } else if (status >= 400) {
+        logger.warn(`Client erro: ${err.message}`, { error: err });
+    }
+
+    res.status(status).json({
+        error: {
+            status,
+            message: error.message,
+            correlationId: req.headers['x-correlation-id'],
+        },
+    });
 });
+
+export default app;
