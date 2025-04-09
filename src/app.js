@@ -12,7 +12,6 @@ import compression from 'compression';
 import morgan from 'morgan';
 import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
-import { createHttpTermiantor } from 'http-terminator';
 import { v4 as uuid4 } from 'uuid';
 import { AsyncLocalStorage } from 'async_hooks';
 
@@ -20,7 +19,9 @@ import logger from './utils/logger.js';
 import routes from './routes/index.js';
 import { getMongoDBHealth } from './database/mongodb.js';
 import { getRedisHealth } from './database/redis.js';
-import { connect } from 'http2';
+import { errorHandler, notFoundHandler, requestTimeout } from './middleware/errorHandler.js';
+
+
 
 // Create request context storage
 global.requestContext = new AsyncLocalStorage();
@@ -94,6 +95,9 @@ app.use(
 
 // Compress responses
 app.use(compression());
+
+//Request timeout protection
+app.use(requestTimeout(30000)); // 30 seconds
 
 // Parse JSON request bodies
 app.use(express.json({ limit: '1mb' }));
@@ -192,5 +196,12 @@ app.use((err, req, res, next) => {
         },
     });
 });
+
+
+// Handle undefined routes
+app.use(notFoundHandler);
+
+// Global error handler - must be last
+app.use(errorHandler);
 
 export default app;

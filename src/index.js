@@ -19,11 +19,11 @@ import logger from './utils/logger.js';
 
 // Import application components
 import app from './app.js';
-import { connectMongoDB, disconnectMongoDB } from './db/mongodb.js';
-import { connectRedis, disconnectRedis } from './db/redis.js';
-import socketServer from  './Services/socket.js';
-import { registerMetrics, getMetricsServer } from './monitoring/metrics.js';
-import { log } from 'console';
+import { connectMongoDB, disconnectMongoDB } from './database/mongodb.js';
+import { connectRedis, disconnectRedis } from './database/redis.js';
+import socketServer from  './services/socket.js';
+// import { registerMetrics, getMetricsServer } from './monitoring/metrics.js';
+// import { log } from 'console';
 
 // Constants from environment variables
 const PORT = process.env.PORT || 3000;
@@ -48,7 +48,7 @@ async function boostrap() {
     logger.info(`Start application in ${NODE_ENV} mode...`);
 
     try {
-        // Register momitoring metrics early
+        // Register monitoring metrics early
         logger.info('Initializing monitoring metrics');
         registerMetrics();
 

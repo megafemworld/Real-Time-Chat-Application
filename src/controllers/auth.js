@@ -16,7 +16,7 @@ import User from '../models/user.js';
 import Token from '../models/token.js';
 import logger from '../utils/logger.js';
 import { CreateError } from '../utils/error.js';
-import { decode } from 'punycode';
+import { parse } from 'path';
 
 /**
  * Register a new user
@@ -93,6 +93,13 @@ const generateTokens = async (user) => {
         process.env.REFRESH_TOKEN_SECRET,
         { expiresIn: process.env.REFRESH_TOKEN_EXPIRATION || '7d' }
     );
+
+    // Calculate expiration data for database
+    const refreshExpiration = new Date();
+    refreshExpiration.setDate(
+        refreshExpiration.getDate() + parseInt(process.env.REFRESH_TOKEN_EXPIRATION || '7', 10)
+    );
+
 
     // Store refresh token in database
     await Token.findOneAndUpdate(

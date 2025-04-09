@@ -12,7 +12,7 @@
 import { createLogger, format, transport, transports } from "winston";
 import DailyRotateFile from 'winston-daily-rotate-file';
 import fs from 'fs';
-import path, { resolve } from 'path';
+import path from 'path';
 import { fileURLToPath } from "url";
 import { timeStamp } from "console";
 
